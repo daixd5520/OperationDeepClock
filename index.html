@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>深空时钟 v2.7</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>深空时钟 <sub>v2.7</sub></h1>
+      <div class="streak-counter">
+        连续校准 <span id="streak-days">0</span> 天
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="today"    role="tab" aria-selected="true">今天</button>
+      <button class="tab"         data-tab="focus"    role="tab" aria-selected="false">专注</button>
+      <button class="tab"         data-tab="data"     role="tab" aria-selected="false">数据</button>
+      <button class="tab"         data-tab="settings" role="tab" aria-selected="false">设置</button>
+    </nav>
+
+    <!-- Tab: 今天 -->
+    <section class="tab-panel active" data-tab-panel="today">
+      <main>
+        <div class="day-info">
+          <h2>Day <span id="current-day">1</span> : <span id="current-phase">引力点火</span></h2>
+        </div>
+
+        <div class="targets-card">
+          <div class="target">
+            <span class="label">目标入睡</span>
+            <span class="time" id="target-sleep">19:30</span>
+          </div>
+          <div class="target">
+            <span class="label">目标起床</span>
+            <span class="time" id="target-wake">04:30</span>
+          </div>
+        </div>
+
+        <div class="rituals-container">
+          <div class="ritual-card">
+            <h3>睡前仪式清单</h3>
+            <ul id="sleep-ritual-list" class="checklist"></ul>
+          </div>
+          <div class="ritual-card">
+            <h3>起床打卡</h3>
+            <div id="wakeup-logger" class="wakeup-logger">
+              <button id="wakeup-button">我起床了！</button>
+              <p>今日记录: <span id="wakeup-time-display">--:--:--</span></p>
+            </div>
+          </div>
+          <div class="ritual-card" id="wake-actions-card">
+            <h3>醒来动作指南</h3>
+            <ul id="wake-actions-list" class="checklist"></ul>
+          </div>
+        </div>
+
+        <div class="progress-card">
+          <h3>今日能量收集 (Δt)</h3>
+          <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <span id="progress-text">0 / 4 Δt</span>
+        </div>
+
+        <div class="combo-card">
+          <h3>连击徽章 & Buff</h3>
+          <div id="combo-badge" class="badge">暂无连击</div>
+          <p id="combo-desc" class="combo-desc">连续获得 ≥3 Δt 将触发连击并解锁徽章！</p>
+        </div>
+
+        <div id="encouragement-card" class="encouragement-card">
+          <p id="encouragement-text">“伟大的航行始于微小的点火。”</p>
+        </div>
+      </main>
+    </section>
+
+    <!-- Tab: 专注 -->
+    <section class="tab-panel" data-tab-panel="focus">
+      <div class="focus-card">
+        <h3>Focus 重心调整（晨→晚）</h3>
+        <p class="focus-weight">当前晨间权重：<span id="morning-weight">20%</span>，晚间权重：<span id="evening-weight">80%</span></p>
+        <div class="focus-windows">
+          <div class="focus-window">
+            <h4>晨间专注窗口</h4>
+            <p id="focus-morning-window">--:-- — --:--</p>
+            <label class="toggle">
+              <input type="checkbox" id="focus-morning-done"/>
+              <span>完成晨间专注</span>
+            </label>
+          </div>
+          <div class="focus-window">
+            <h4>晚间专注窗口</h4>
+            <p id="focus-evening-window">--:-- — --:--</p>
+            <label class="toggle">
+              <input type="checkbox" id="focus-evening-done"/>
+              <span>完成晚间专注</span>
+            </label>
+          </div>
+        </div>
+        <p class="focus-tip">提示：前期尽量把产出放在晚间窗口，随天数推进把重点迁移到晨间窗口。</p>
+      </div>
+    </section>
+
+    <!-- Tab: 数据 -->
+    <section class="tab-panel" data-tab-panel="data">
+      <div class="dashboard">
+        <h2>数据中心</h2>
+        <div class="stats-grid">
+          <div class="stat-item"><h4>最长连续</h4><p><span id="longest-streak">0</span> 天</p></div>
+          <div class="stat-item"><h4>总记录天数</h4><p><span id="total-days">0</span> 天</p></div>
+          <div class="stat-item"><h4>平均完成率</h4><p><span id="completion-rate">0</span>%</p></div>
+        </div>
+
+        <h3>起床时间趋势 (近30天)</h3>
+        <div class="chart-container">
+          <canvas id="wakeup-chart"></canvas>
+          <div id="chart-placeholder" class="chart-placeholder">
+            <p>📈</p>
+            <p>开始记录你的起床时间，</p>
+            <p>这里将自动绘制你的进步曲线！</p>
+          </div>
+        </div>
+
+        <h3>执行热力图 (近90天)</h3>
+        <div id="heatmap-container" class="heatmap-container">
+          <div id="heatmap-placeholder" class="chart-placeholder">
+            <p>✨</p>
+            <p>你每一次的努力，</p>
+            <p>都将在这里点亮一颗星星。今天就开始吧！</p>
+          </div>
+        </div>
+
+        <h3>成就墙</h3>
+        <div id="achievements" class="achievements"></div>
+      </div>
+    </section>
+
+    <!-- Tab: 设置 -->
+    <section class="tab-panel" data-tab-panel="settings">
+      <div class="settings-card">
+        <h3>数据与备份</h3>
+        <div class="footer-actions">
+          <button id="backup-button" class="btn-ghost">手动备份</button>
+          <button id="export-button" class="btn-ghost">导出数据</button>
+          <label for="import-file" class="btn-ghost as-button">导入数据<input id="import-file" type="file" accept="application/json" hidden></label>
+          <button id="reset-button" class="btn-danger">重置所有进度</button>
+        </div>
+        <p class="settings-tip">说明：应用会自动进行每日备份（最多保留 10 份循环）。导出/导入为 JSON，便于跨设备迁移。</p>
+      </div>
+
+      <div class="settings-card">
+        <h3>GitHub 同步（可选）</h3>
+        <div class="gh-grid">
+          <label>个人令牌（仅勾选 gist 权限）<input id="gh-token" type="password" placeholder="ghp_..."/></label>
+          <label>Gist ID（留空则自动创建）<input id="gh-gist-id" type="text" placeholder="例如：a1b2c3d4..."/></label>
+          <label>文件名<input id="gh-filename" type="text" value="deep-space-clock.json"/></label>
+          <label class="toggle-row"><input id="gh-auto-sync" type="checkbox"/> 保存时自动同步到 GitHub</label>
+        </div>
+        <div class="footer-actions">
+          <button id="gh-save" class="btn-ghost">保存设置</button>
+          <button id="gh-create" class="btn-ghost">创建私密 Gist</button>
+          <button id="gh-upload" class="btn-ghost">立即上传</button>
+          <button id="gh-download" class="btn-ghost">从 GitHub 下载</button>
+          <button id="gh-disconnect" class="btn-danger">清除令牌</button>
+        </div>
+        <p class="settings-tip">
+          注意：私密 Gist 是“未列出”，知道链接的人可访问；请妥善保管 Gist ID 与令牌。令牌仅保存在你的浏览器本地，不会上传到服务器。
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

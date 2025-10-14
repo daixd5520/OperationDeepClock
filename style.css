@@ -172,3 +172,84 @@ main,.dashboard,.settings-card,.focus-card{
   transform:translateY(-10px);transition:opacity .2s,transform .2s;z-index:9999;border:1px solid rgba(255,255,255,.1);
 }
 .toast.show{opacity:1;transform:translateY(0);}
+
+/* 成就系统样式 */
+.achievement-stats{
+  background:rgba(0,0,0,.2);padding:15px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+}
+.achievement-stats .stat-item{display:flex;flex-direction:column;align-items:center;}
+.achievement-stats .stat-label{font-size:.8em;color:var(--secondary-text);margin-bottom:3px;}
+.achievement-stats .stat-value{font-size:1.2em;font-weight:bold;color:var(--progress-bar-color);font-family:'Orbitron',sans-serif;}
+.achievement-stats .progress-bar{width:100%;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-top:5px;}
+.achievement-stats .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent-color),var(--progress-bar-color));transition:width .5s ease;}
+
+.achievements{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:15px;}
+.ach-card{
+  background:rgba(0,0,0,.2);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,.1);
+  display:flex;gap:12px;align-items:flex-start;transition:all .3s ease;position:relative;overflow:hidden;
+}
+.ach-card.unlocked{
+  background:rgba(0,255,200,.1);border-color:rgba(0,255,200,.3);box-shadow:0 0 20px rgba(0,255,200,.2);
+}
+.ach-card.locked{opacity:0.7;}
+.ach-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.4);}
+
+/* 稀有度边框颜色 */
+.ach-card.rarity-common{border-color:rgba(76,175,80,.3);}
+.ach-card.rarity-common.unlocked{background:rgba(76,175,80,.1);border-color:rgba(76,175,80,.6);}
+.ach-card.rarity-rare{border-color:rgba(33,150,243,.3);}
+.ach-card.rarity-rare.unlocked{background:rgba(33,150,243,.1);border-color:rgba(33,150,243,.6);}
+.ach-card.rarity-epic{border-color:rgba(156,39,176,.3);}
+.ach-card.rarity-epic.unlocked{background:rgba(156,39,176,.1);border-color:rgba(156,39,176,.6);}
+.ach-card.rarity-legendary{border-color:rgba(255,193,7,.3);}
+.ach-card.rarity-legendary.unlocked{background:rgba(255,193,7,.1);border-color:rgba(255,193,7,.6);box-shadow:0 0 30px rgba(255,193,7,.3);}
+.ach-card.rarity-secret{border-color:rgba(244,67,54,.3);}
+.ach-card.rarity-secret.unlocked{background:rgba(244,67,54,.1);border-color:rgba(244,67,54,.6);}
+
+.ach-icon{
+  width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;background:rgba(255,255,255,.1);
+  flex-shrink:0;transition:all .3s ease;
+}
+.ach-card.unlocked .ach-icon.icon-unlocked{
+  background:linear-gradient(135deg,var(--accent-color),var(--progress-bar-color));animation:pulse 2s infinite;
+}
+.ach-checkmark{
+  position:absolute;top:8px;right:8px;width:24px;height:24px;background:var(--progress-bar-color);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;animation:checkmarkPop .4s ease-out;
+}
+
+.ach-body{flex:1;min-width:0;}
+.ach-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;}
+.ach-name{font-weight:bold;color:var(--primary-text);font-size:.95em;margin:0;}
+.ach-points{font-size:.8em;color:var(--progress-bar-color);font-weight:bold;background:rgba(0,255,200,.1);padding:2px 6px;border-radius:4px;}
+.ach-desc{font-size:.85em;color:var(--secondary-text);line-height:1.3;margin-bottom:8px;}
+
+.achievement-progress{margin-top:8px;}
+.achievement-progress .progress-bar{width:100%;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-bottom:4px;}
+.achievement-progress .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent-color),var(--progress-bar-color));transition:width .3s ease;}
+.achievement-progress .progress-text{font-size:.75em;color:var(--secondary-text);text-align:right;}
+
+.ach-rarity{font-size:.8em;color:var(--secondary-text);display:flex;align-items:center;gap:4px;}
+
+/* 成就解锁动画 */
+@keyframes achievementUnlock{
+  0%{transform:scale(0.8);opacity:0;}
+  50%{transform:scale(1.05);opacity:1;}
+  100%{transform:scale(1);opacity:1;}
+}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 10px rgba(0,255,200,.5);}
+  50%{box-shadow:0 0 20px rgba(0,255,200,.8);}
+}
+@keyframes checkmarkPop{
+  0%{transform:scale(0) rotate(-180deg);opacity:0;}
+  50%{transform:scale(1.2) rotate(10deg);opacity:1;}
+  100%{transform:scale(1) rotate(0);opacity:1;}
+}
+
+/* 响应式设计 */
+@media (max-width:480px){
+  .achievements{grid-template-columns:1fr;}
+  .achievement-stats{flex-direction:column;gap:8px;text-align:center;}
+  .ach-card{padding:12px;}
+  .ach-icon{width:40px;height:40px;font-size:20px;}
+}

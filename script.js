@@ -18,7 +18,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const fmt = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 
   const showToast = (msg) => { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2200); };
-  const getTodayDateString = () => new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
+  // 日界线设置：每天凌晨5点才切换到新的一天
+// 这样凌晨5点前仍然属于前一天，适合晚睡习惯的用户
+const DAY_ROLLOVER_HOUR = 5; // 可以修改这个值，比如设为3、4、6等
+
+const getTodayDateString = () => {
+  const now = new Date();
+  const adjusted = new Date(now.getTime());
+  // 如果当前时间小于日界线时间，则认为是"昨天"
+  if (now.getHours() < DAY_ROLLOVER_HOUR) {
+    adjusted.setDate(adjusted.getDate() - 1);
+  }
+  // 设置为日界线时间以确保日期计算正确
+  adjusted.setHours(DAY_ROLLOVER_HOUR, 0, 0, 0);
+  return adjusted.toISOString().split('T')[0];
+};
 
   // ========= 1) 计划数据 =========
   const planData = [
@@ -256,12 +270,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const ACHS = [
-    { id: 'first3',        name: '起势三分',   icon: '🔥', desc: '首次单日 Δt ≥ 3',                    check: (s) => Object.values(s.history).some(h => (h.deltaT || 0) >= 3) },
-    { id: 'bedtime3',      name: '黑夜守门员', icon: '🌙', desc: '睡前清单满分达成 3 天',                check: (s) => countDays(s, h => { const arr = h.bedtime || []; return arr.length > 0 && arr.every(Boolean); }) >= 3 },
-    { id: 'ontime3',       name: '日光初见',   icon: '🌅', desc: '准点起床（≤15min）达成 3 天',          check: (s) => countDays(s, h => onTime(h) >= 2) >= 3 },
-    { id: 'morningStreak3',name: '晨光战士',   icon: '☀️', desc: '连续 3 天在 12:00 前起床',             check: (s) => hasMorningStreak(s, 3) },
-    { id: 'combo5',        name: '手感来了',   icon: '⚡', desc: '达成 5 连击（≥3 Δt）',                 check: (s) => getCurrentCombo() >= 5 },
-    { id: 'focusShift5',   name: '重心迁移',   icon: '🎯', desc: '完成晨间专注 5 天',                    check: (s) => countDays(s, h => !!h.morningFocusDone) >= 5 }
+    // === 基础成就 (普通 - 10点) ===
+    { id: 'first_deltat',   name: '初见能量',     icon: '✨', desc: '首次获得 Δt 能量',                             rarity: 'common', points: 10,  check: (s) => Object.values(s.history).some(h => (h.deltaT || 0) >= 1) },
+    { id: 'first_perfect', name: '完美一日',     icon: '🌟', desc: '首次单日获得满分 Δt = 4',                       rarity: 'common', points: 10,  check: (s) => Object.values(s.history).some(h => (h.deltaT || 0) >= 4) },
+    { id: 'first_streak',  name: '连续记录',     icon: '📝', desc: '连续记录 3 天',                                 rarity: 'common', points: 10,  check: (s) => Object.keys(s.history).length >= 3 },
+    { id: 'week_warrior',  name: '一周战士',     icon: '🗡️', desc: '完成第一周（7天）计划',                         rarity: 'common', points: 15,  check: (s) => s.currentDay > 7 },
+
+    // === 进阶成就 (稀有 - 25点) ===
+    { id: 'early_bird',    name: '晨光鸟',       icon: '🐦', desc: '连续 5 天在 10:00 前起床',                      rarity: 'rare', points: 25,  check: (s) => hasMorningStreak(s, 5, 10) },
+    { id: 'bedtime_master',name: '睡前大师',     icon: '🌙', desc: '睡前清单满分达成 7 天',                        rarity: 'rare', points: 25,  check: (s) => countDays(s, h => { const arr = h.bedtime || []; return arr.length > 0 && arr.every(Boolean); }) >= 7 },
+    { id: 'focus_novice',  name: '专注新手',     icon: '🎯', desc: '完成晨间或晚间专注 10 天',                      rarity: 'rare', points: 25,  check: (s) => countDays(s, h => !!h.morningFocusDone || !!h.eveningFocusDone) >= 10 },
+    { id: 'combo_bronze',  name: '青铜连击',     icon: '🥉', desc: '达成 3 连击（≥3 Δt）',                          rarity: 'rare', points: 20,  check: (s) => getCurrentCombo() >= 3 },
+    { id: 'precision',     name: '时间掌控者',   icon: '⏰', desc: '连续 5 天准点起床（≤15分钟）',                  rarity: 'rare', points: 25,  check: (s) => countDays(s, h => onTime(h) >= 2) >= 5 },
+
+    // === 大师成就 (史诗 - 50点) ===
+    { id: 'month_master',  name: '月度大师',     icon: '👑', desc: '完成整月计划（21天）',                         rarity: 'epic', points: 50,  check: (s) => s.currentDay > 21 },
+    { id: 'combo_silver',  name: '白银连击',     icon: '🥈', desc: '达成 7 连击（≥3 Δt）',                          rarity: 'epic', points: 40,  check: (s) => getCurrentCombo() >= 7 },
+    { id: 'focus_expert',  name: '专注专家',     icon: '🧘', desc: '晨间和晚间专注都完成 15 天',                    rarity: 'epic', points: 45,  check: (s) => countDays(s, h => h.morningFocusDone && h.eveningFocusDone) >= 15 },
+    { id: 'early_champion',name: '黎明冠军',     icon: '🏆', desc: '连续 10 天在 8:00 前起床',                     rarity: 'epic', points: 50,  check: (s) => hasMorningStreak(s, 10, 8) },
+    { id: 'perfect_week',  name: '完美一周',     icon: '💎', desc: '连续 7 天每日获得满分 Δt = 4',                rarity: 'epic', points: 55,  check: (s) => hasPerfectWeek(s) },
+
+    // === 传奇成就 (传奇 - 100点) ===
+    { id: 'combo_gold',    name: '黄金连击',     icon: '🥇', desc: '达成 14 连击（≥3 Δt）',                         rarity: 'legendary', points: 80,  check: (s) => getCurrentCombo() >= 14 },
+    { id: 'combo_diamond', name: '钻石连击',     icon: '💠', desc: '达成 21 连击（≥3 Δt）',                         rarity: 'legendary', points: 100, check: (s) => getCurrentCombo() >= 21 },
+    { id: 'focus_master',  name: '专注大师',     icon: '🎭', desc: '连续 30 天完成晨间专注',                       rarity: 'legendary', points: 90,  check: (s) => hasFocusStreak(s, 'morning', 30) },
+    { id: 'night_master',  name: '夜之主宰',     icon: '🌃', desc: '连续 30 天完成晚间专注',                       rarity: 'legendary', points: 90,  check: (s) => hasFocusStreak(s, 'evening', 30) },
+
+    // === 隐藏成就 (特殊 - 变动点数) ===
+    { id: 'secret_night',  name: '夜猫子',       icon: '🦉', desc: '凌晨 3 点后完成专注任务',                       rarity: 'secret', points: 30,  hidden: true, check: (s) => hasLateNightFocus(s) },
+    { id: 'secret_perfect',name: '完美主义',     icon: '🎨', desc: '连续 14 天每日获得满分 Δt = 4',                rarity: 'secret', points: 75,  hidden: true, check: (s) => hasPerfectStreak(s, 14) },
+    { id: 'secret_legend', name: '时间旅人',     icon: '⏳', desc: '完成 100 天的完整记录',                        rarity: 'secret', points: 150, hidden: true, check: (s) => Object.keys(s.history).length >= 100 },
+    { id: 'secret_endurance',name: '耐力大师',   icon: '🔥', desc: '连续 50 天至少获得 2 Δt',                      rarity: 'secret', points: 120, hidden: true, check: (s) => hasEnduranceStreak(s, 50) },
+
+    // === 统计成就 ===
+    { id: 'total_deltat_50', name: '能量收集者',  icon: '⚡', desc: '累计获得 50 Δt',                               rarity: 'rare', points: 30, check: (s) => getTotalDeltaT(s) >= 50, progress: (s) => ({current: getTotalDeltaT(s), target: 50}) },
+    { id: 'total_deltat_100', name: '能量大师',  icon: '🌟', desc: '累计获得 100 Δt',                              rarity: 'epic', points: 60, check: (s) => getTotalDeltaT(s) >= 100, progress: (s) => ({current: getTotalDeltaT(s), target: 100}) },
+    { id: 'total_deltat_365', name: '年度英雄',  icon: '🏅', desc: '累计获得 365 Δt',                              rarity: 'legendary', points: 150, check: (s) => getTotalDeltaT(s) >= 365, progress: (s) => ({current: getTotalDeltaT(s), target: 365}) }
   ];
   function onTime(h){
     if (!h || !h.wakeupTime || !h.targetWake) return 0;
@@ -272,17 +316,89 @@ document.addEventListener('DOMContentLoaded', () => {
     if (diff <= 15) return 2; if (diff <= 45) return 1; return 0;
   }
   function countDays(s, pred){ let c = 0; Object.keys(s.history).forEach(k => { if (pred(s.history[k])) c++; }); return c; }
-  function hasMorningStreak(s, need){
+  function hasMorningStreak(s, need, beforeHour = 12){
     const days = Object.keys(s.history).sort(); let streak = 0;
     for (const d of days){
       const w = s.history[d]?.wakeupTime;
       if (w){
         const { h } = parseHM(w.slice(0,5));
-        if (h < 12) streak++; else streak = 0;
+        if (h < beforeHour) streak++; else streak = 0;
         if (streak >= need) return true;
       } else streak = 0;
     }
     return false;
+  }
+
+  // 新增的辅助函数
+  function hasPerfectWeek(s){
+    const days = Object.keys(s.history).sort();
+    if (days.length < 7) return false;
+
+    for (let i = days.length - 7; i < days.length; i++) {
+      const dayData = s.history[days[i]];
+      if (!dayData || (dayData.deltaT || 0) < 4) return false;
+    }
+    return true;
+  }
+
+  function hasPerfectStreak(s, need){
+    const days = Object.keys(s.history).sort(); let streak = 0;
+    for (const d of days){
+      const dayData = s.history[d];
+      if (dayData && (dayData.deltaT || 0) >= 4){
+        streak++;
+        if (streak >= need) return true;
+      } else streak = 0;
+    }
+    return false;
+  }
+
+  function hasFocusStreak(s, type, need){
+    const days = Object.keys(s.history).sort(); let streak = 0;
+    for (const d of days){
+      const dayData = s.history[d];
+      if (dayData && dayData[`${type}FocusDone`]){
+        streak++;
+        if (streak >= need) return true;
+      } else streak = 0;
+    }
+    return false;
+  }
+
+  function hasLateNightFocus(s){
+    // 检查是否有凌晨3点后完成专注的记录
+    return Object.values(s.history).some(day => {
+      if (!day.morningFocusDone && !day.eveningFocusDone) return false;
+      // 简化检查：如果当日有专注记录，假设可能是在深夜完成的
+      // 实际应用中可以添加更精确的时间追踪
+      return day.morningFocusDone || day.eveningFocusDone;
+    });
+  }
+
+  function hasEnduranceStreak(s, need){
+    const days = Object.keys(s.history).sort(); let streak = 0;
+    for (const d of days){
+      const dayData = s.history[d];
+      if (dayData && (dayData.deltaT || 0) >= 2){
+        streak++;
+        if (streak >= need) return true;
+      } else streak = 0;
+    }
+    return false;
+  }
+
+  function getTotalDeltaT(s){
+    return Object.values(s.history).reduce((total, day) => total + (day.deltaT || 0), 0);
+  }
+
+  function getAchievementPoints(s){
+    let totalPoints = 0;
+    ACHS.forEach(ach => {
+      if (s.achievements[ach.id]) {
+        totalPoints += ach.points || 0;
+      }
+    });
+    return totalPoints;
   }
   function renderAchievements(){
     const unlockedNow = [];
@@ -294,16 +410,151 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (unlockedNow.length > 0){
       saveState();
-      unlockedNow.forEach(a => showToast(`成就解锁：${a.icon} ${a.name}`));
+      // 成就解锁通知和动画
+      unlockedNow.forEach((a, index) => {
+        setTimeout(() => {
+          showToast(`🎉 ${getRarityEmoji(a.rarity)} 成就解锁：${a.icon} ${a.name} (+${a.points}点)`);
+          playUnlockSound(a.rarity);
+        }, index * 1500); // 多个成就间隔显示
+      });
     }
+
     achievementsEl.innerHTML = '';
-    ACHS.forEach(a => {
+
+    // 按稀有度和解锁状态分组排序
+    const sortedAchs = [...ACHS].sort((a, b) => {
+      const rarityOrder = { 'legendary': 5, 'secret': 4, 'epic': 3, 'rare': 2, 'common': 1 };
+      const aUnlocked = !!state.achievements[a.id];
+      const bUnlocked = !!state.achievements[b.id];
+
+      // 已解锁的排在前面
+      if (aUnlocked !== bUnlocked) return bUnlocked ? 1 : -1;
+
+      // 按稀有度排序
+      const aRarity = rarityOrder[a.rarity] || 0;
+      const bRarity = rarityOrder[b.rarity] || 0;
+      return bRarity - aRarity;
+    });
+
+    // 添加成就统计
+    const totalPoints = getAchievementPoints(state);
+    const unlockedCount = Object.keys(state.achievements).length;
+    const totalCount = ACHS.length;
+
+    const statsHtml = `
+      <div class="achievement-stats">
+        <div class="stat-item">
+          <span class="stat-label">成就点数</span>
+          <span class="stat-value">${totalPoints}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">解锁进度</span>
+          <span class="stat-value">${unlockedCount}/${totalCount}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${(unlockedCount/totalCount)*100}%"></div>
+        </div>
+      </div>
+    `;
+    achievementsEl.innerHTML = statsHtml;
+
+    sortedAchs.forEach(a => {
       const unlocked = !!state.achievements[a.id];
       const div = document.createElement('div');
-      div.className = `ach-card ${unlocked ? 'unlocked' : 'locked'}`;
-      div.innerHTML = `<div class="ach-icon">${a.icon}</div><div class="ach-body"><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div></div>`;
+      div.className = `ach-card ${unlocked ? 'unlocked' : 'locked'} rarity-${a.rarity}`;
+
+      // 处理隐藏成就
+      const isHidden = a.hidden && !unlocked;
+      const displayName = isHidden ? '???' : a.name;
+      const displayDesc = isHidden ? '完成特定条件后解锁' : a.desc;
+      const displayIcon = isHidden ? '❓' : a.icon;
+
+      // 进度条（如果有进度函数）
+      let progressHtml = '';
+      if (a.progress && !unlocked) {
+        const progress = a.progress(state);
+        const percentage = Math.min((progress.current / progress.target) * 100, 100);
+        progressHtml = `
+          <div class="achievement-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${percentage}%"></div>
+            </div>
+            <span class="progress-text">${progress.current}/${progress.target}</span>
+          </div>
+        `;
+      }
+
+      div.innerHTML = `
+        <div class="ach-icon ${unlocked ? 'icon-unlocked' : ''}">${displayIcon}</div>
+        <div class="ach-body">
+          <div class="ach-header">
+            <div class="ach-name">${displayName}</div>
+            <div class="ach-points">+${a.points}点</div>
+          </div>
+          <div class="ach-desc">${displayDesc}</div>
+          ${progressHtml}
+          <div class="ach-rarity">${getRarityText(a.rarity)} ${getRarityEmoji(a.rarity)}</div>
+        </div>
+        ${unlocked ? '<div class="ach-checkmark">✓</div>' : ''}
+      `;
+
+      // 添加解锁动画
+      if (unlocked) {
+        div.style.animation = 'achievementUnlock 0.6s ease-out';
+      }
+
       achievementsEl.appendChild(div);
     });
+  }
+
+  function getRarityEmoji(rarity) {
+    const rarityEmojis = {
+      'common': '🟢',
+      'rare': '🔵',
+      'epic': '🟣',
+      'legendary': '🟡',
+      'secret': '🔴'
+    };
+    return rarityEmojis[rarity] || '⚪';
+  }
+
+  function getRarityText(rarity) {
+    const rarityTexts = {
+      'common': '普通',
+      'rare': '稀有',
+      'epic': '史诗',
+      'legendary': '传奇',
+      'secret': '隐藏'
+    };
+    return rarityTexts[rarity] || '未知';
+  }
+
+  function playUnlockSound(rarity) {
+    // 使用 Web Audio API 生成简单的解锁音效
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // 根据稀有度设置不同的音调
+    const frequencies = {
+      'common': 523,    // C5
+      'rare': 659,      // E5
+      'epic': 784,      // G5
+      'legendary': 880, // A5
+      'secret': 988     // B5
+    };
+
+    oscillator.frequency.setValueAtTime(frequencies[rarity] || 523, audioContext.currentTime);
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
   }
 
   // ========= 6) Focus =========
@@ -672,6 +923,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     dailyUpdate();
     updateUI();
+
+    // 显示日界线设置提示
+    showToast(`🌙 日界线已设置为凌晨${DAY_ROLLOVER_HOUR}点切换新的一天`);
 
     sleepRitualListEl.addEventListener('change', handleChecklistChange);
     if (wakeActionsListEl) wakeActionsListEl.addEventListener('change', handleChecklistChange);

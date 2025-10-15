@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const LAST_BACKUP_DATE_KEY = 'deepSpaceClockLastBackupDate';
   const ACTIVE_TAB_KEY = 'deepSpaceClockActiveTab';
   const SYNC_KEY = 'deepSpaceClockGitHubSync';
-  const CURRENT_SCHEMA = 4;
+  const CURRENT_SCHEMA = 5;
 
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -18,9 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const fmt = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 
   const showToast = (msg) => { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2200); };
-  // 日界线设置：每天凌晨5点才切换到新的一天
-// 这样凌晨5点前仍然属于前一天，适合晚睡习惯的用户
-const DAY_ROLLOVER_HOUR = 5; // 可以修改这个值，比如设为3、4、6等
+  // 日界线设置：每天下午4点才切换到新的一天
+// 适合晚睡晚起的用户，确保睡前和醒后的活动记录在同一天
+const DAY_ROLLOVER_HOUR = 16; // 下午4点切换到新的一天
 
 const getTodayDateString = () => {
   const now = new Date();
@@ -190,6 +190,26 @@ const getTodayDateString = () => {
         h.dateStr = h.dateStr || d;
       });
       s.version = 4;
+    }
+    if (s.version < 5){
+      // 日界线调整迁移：从凌晨5点改为下午4点
+      // 只在第一次升级时执行，通过检查标记位避免重复迁移
+      if (!s.rolloverMigrated) {
+        const newHistory = {};
+        Object.keys(s.history).forEach(oldDateStr => {
+          const dayData = s.history[oldDateStr];
+          // 将日期向后推一天，以匹配新的日界线逻辑
+          const oldDate = new Date(oldDateStr);
+          oldDate.setDate(oldDate.getDate() + 1);
+          const newDateStr = oldDate.toISOString().split('T')[0];
+          newHistory[newDateStr] = dayData;
+          // 更新记录中的日期字符串
+          dayData.dateStr = newDateStr;
+        });
+        s.history = newHistory;
+        s.rolloverMigrated = true; // 标记已完成迁移
+      }
+      s.version = 5;
     }
     if (s.currentDay < 1) s.currentDay = 1;
     return s;

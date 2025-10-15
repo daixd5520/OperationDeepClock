@@ -93,6 +93,27 @@ const getTodayDateString = () => {
   const focusMorningDoneEl = document.getElementById('focus-morning-done');
   const focusEveningDoneEl = document.getElementById('focus-evening-done');
 
+  // History Manager
+  const historySearchEl = document.getElementById('history-search');
+  const historyFilterEl = document.getElementById('history-filter');
+  const historyAddNewEl = document.getElementById('history-add-new');
+  const historyListEl = document.getElementById('history-list');
+  const historyPlaceholderEl = document.getElementById('history-placeholder');
+
+  // Modal
+  const historyModal = document.getElementById('history-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalClose = document.getElementById('modal-close');
+  const modalDate = document.getElementById('modal-date');
+  const modalWakeupTime = document.getElementById('modal-wakeup-time');
+  const modalBedtimeList = document.getElementById('modal-bedtime-list');
+  const modalMorningList = document.getElementById('modal-morning-list');
+  const modalMorningFocus = document.getElementById('modal-morning-focus');
+  const modalEveningFocus = document.getElementById('modal-evening-focus');
+  const modalDelete = document.getElementById('modal-delete');
+  const modalCancel = document.getElementById('modal-cancel');
+  const modalSave = document.getElementById('modal-save');
+
   // Tabs
   const tabButtons = Array.from(document.querySelectorAll('.tab'));
   const tabPanels  = Array.from(document.querySelectorAll('.tab-panel'));
@@ -584,13 +605,272 @@ const getTodayDateString = () => {
     tabButtons.forEach(btn => { const on = btn.dataset.tab === name; btn.classList.toggle('active', on); btn.setAttribute('aria-selected', on ? 'true' : 'false'); });
     tabPanels.forEach(panel => { panel.classList.toggle('active', panel.dataset.tabPanel === name); });
     if (name === 'data') renderWakeupChart(true);
+    if (name === 'history') renderHistoryManager();
   }
   function setupTabs(){
     tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
     setActiveTab(localStorage.getItem(ACTIVE_TAB_KEY) || 'today');
   }
 
-  // ========= 8) UI =========
+  // ========= 8) 历史记录管理 =========
+  let currentEditingDate = null;
+
+  function renderHistoryManager(){
+    const historyKeys = Object.keys(state.history).sort().reverse(); // 最新的在前
+    const searchTerm = historySearchEl.value.toLowerCase().trim();
+    const filterType = historyFilterEl.value;
+
+    let filteredKeys = historyKeys.filter(dateStr => {
+      const dayData = state.history[dateStr];
+
+      // 搜索过滤
+      if (searchTerm && !dateStr.includes(searchTerm)) return false;
+
+      // 类型过滤
+      switch (filterType) {
+        case 'wakeup':
+          return !!dayData.wakeupTime;
+        case 'perfect':
+          return (dayData.deltaT || 0) >= 4;
+        case 'incomplete':
+          return (dayData.deltaT || 0) === 0;
+        default:
+          return true;
+      }
+    });
+
+    if (filteredKeys.length === 0) {
+      historyListEl.style.display = 'none';
+      historyPlaceholderEl.style.display = 'flex';
+      if (historyKeys.length === 0) {
+        historyPlaceholderEl.innerHTML = `
+          <p>📅</p>
+          <p>暂无历史记录</p>
+          <p>开始记录后，这里将显示你的所有打卡历史</p>
+        `;
+      } else {
+        historyPlaceholderEl.innerHTML = `
+          <p>🔍</p>
+          <p>没有找到符合条件的记录</p>
+          <p>尝试调整搜索条件或筛选器</p>
+        `;
+      }
+      return;
+    }
+
+    historyListEl.style.display = 'block';
+    historyPlaceholderEl.style.display = 'none';
+    historyListEl.innerHTML = '';
+
+    filteredKeys.forEach(dateStr => {
+      const dayData = state.history[dateStr];
+      const dayIndex = Math.min(planIndexByDate(dateStr), planData.length - 1);
+      const planDay = planData[dayIndex];
+
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+
+      // 计算完成状态
+      const bedtimeCompleted = dayData.bedtime ? dayData.bedtime.filter(Boolean).length : 0;
+      const bedtimeTotal = planDay.sleepRitual.length;
+      const morningCompleted = dayData.morning ? dayData.morning.filter(Boolean).length : 0;
+      const morningTotal = (planDay.wakeActions || []).length;
+      const deltaT = dayData.deltaT || 0;
+
+      historyItem.innerHTML = `
+        <div class="history-date">
+          <span class="date-text">${dateStr}</span>
+          <span class="date-day">Day ${Math.min(dayIndex + 2, planData.length)}</span>
+        </div>
+        <div class="history-summary">
+          <div class="summary-item">
+            <span class="label">起床</span>
+            <span class="value ${dayData.wakeupTime ? 'completed' : 'missing'}">
+              ${dayData.wakeupTime || '--:--'}
+            </span>
+          </div>
+          <div class="summary-item">
+            <span class="label">睡前</span>
+            <span class="value">${bedtimeCompleted}/${bedtimeTotal}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">起床</span>
+            <span class="value">${morningCompleted}/${morningTotal}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Δt</span>
+            <span class="value delta-t delta-${deltaT}">${deltaT}</span>
+          </div>
+        </div>
+        <div class="history-actions">
+          <button class="btn-small btn-edit" data-date="${dateStr}">编辑</button>
+        </div>
+      `;
+
+      historyListEl.appendChild(historyItem);
+    });
+
+    // 绑定编辑按钮事件
+    historyListEl.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const dateStr = e.target.dataset.date;
+        openHistoryModal(dateStr);
+      });
+    });
+  }
+
+  function openHistoryModal(dateStr = null) {
+    currentEditingDate = dateStr;
+    const isNew = !dateStr;
+
+    modalTitle.textContent = isNew ? '添加新记录' : '编辑历史记录';
+    modalDelete.style.display = isNew ? 'none' : 'block';
+
+    if (isNew) {
+      // 新记录：默认为今天
+      modalDate.value = getTodayDateString();
+      modalWakeupTime.value = '';
+      modalMorningFocus.checked = false;
+      modalEveningFocus.checked = false;
+    } else {
+      // 编辑现有记录
+      const dayData = state.history[dateStr];
+      if (!dayData) return;
+
+      modalDate.value = dateStr;
+      modalWakeupTime.value = dayData.wakeupTime || '';
+      modalMorningFocus.checked = !!dayData.morningFocusDone;
+      modalEveningFocus.checked = !!dayData.eveningFocusDone;
+    }
+
+    // 渲染清单项
+    renderModalChecklists(dateStr);
+
+    // 显示模态框
+    historyModal.classList.add('show');
+    modalDate.focus();
+  }
+
+  function renderModalChecklists(dateStr) {
+    const dayIndex = dateStr ? Math.min(planIndexByDate(dateStr), planData.length - 1) : 0;
+    const planDay = planData[dayIndex];
+    const dayData = dateStr ? state.history[dateStr] : null;
+
+    // 睡前清单
+    modalBedtimeList.innerHTML = '';
+    planDay.sleepRitual.forEach((task, index) => {
+      const div = document.createElement('div');
+      div.className = 'modal-checklist-item';
+      div.innerHTML = `
+        <input type="checkbox" id="modal-bedtime-${index}" ${dayData?.bedtime?.[index] ? 'checked' : ''} />
+        <label for="modal-bedtime-${index}">${task}</label>
+      `;
+      modalBedtimeList.appendChild(div);
+    });
+
+    // 起床清单
+    modalMorningList.innerHTML = '';
+    if (planDay.wakeActions && planDay.wakeActions.length > 0) {
+      planDay.wakeActions.forEach((task, index) => {
+        const div = document.createElement('div');
+        div.className = 'modal-checklist-item';
+        div.innerHTML = `
+          <input type="checkbox" id="modal-morning-${index}" ${dayData?.morning?.[index] ? 'checked' : ''} />
+          <label for="modal-morning-${index}">${task}</label>
+        `;
+        modalMorningList.appendChild(div);
+      });
+    } else {
+      modalMorningList.parentElement.style.display = 'none';
+    }
+  }
+
+  function saveHistoryRecord() {
+    const dateStr = modalDate.value;
+    if (!dateStr) {
+      showToast('⚠️ 请选择日期');
+      return;
+    }
+
+    // 获取表单数据
+    const wakeupTime = modalWakeupTime.value;
+    const bedtimeChecks = Array.from(modalBedtimeList.querySelectorAll('input')).map(input => input.checked);
+    const morningChecks = Array.from(modalMorningList.querySelectorAll('input')).map(input => input.checked);
+
+    // 确保历史记录对象存在
+    if (!state.history[dateStr]) {
+      state.history[dateStr] = {};
+    }
+
+    // 更新数据
+    const dayData = state.history[dateStr];
+    dayData.wakeupTime = wakeupTime || null;
+    dayData.bedtime = bedtimeChecks;
+    dayData.morning = morningChecks;
+    dayData.morningFocusDone = modalMorningFocus.checked;
+    dayData.eveningFocusDone = modalEveningFocus.checked;
+    dayData.dateStr = dateStr;
+
+    // 重新计算 Δt
+    calculateDeltaTForDay(dateStr);
+
+    // 保存并更新界面
+    saveState();
+    updateUI();
+    renderHistoryManager();
+    closeHistoryModal();
+
+    showToast(`✅ ${currentEditingDate ? '更新' : '添加'}记录成功`);
+  }
+
+  function deleteHistoryRecord() {
+    if (!currentEditingDate) return;
+
+    if (confirm(`确定要删除 ${currentEditingDate} 的记录吗？此操作不可撤销。`)) {
+      delete state.history[currentEditingDate];
+      saveState();
+      updateUI();
+      renderHistoryManager();
+      closeHistoryModal();
+      showToast('🗑️ 记录已删除');
+    }
+  }
+
+  function closeHistoryModal() {
+    historyModal.classList.remove('show');
+    currentEditingDate = null;
+  }
+
+  function calculateDeltaTForDay(dateStr) {
+    const dayData = state.history[dateStr];
+    if (!dayData) return;
+
+    const dayIndex = Math.min(planIndexByDate(dateStr), planData.length - 1);
+    const planDay = planData[dayIndex];
+
+    // 睡前 Δt
+    const bedtimeTasks = dayData.bedtime || [];
+    const bedtimeCompleted = bedtimeTasks.filter(Boolean).length;
+    let bedtimeDelta = 0;
+    if (bedtimeTasks.length > 0) {
+      if (bedtimeCompleted === bedtimeTasks.length) bedtimeDelta = 2;
+      else if (bedtimeCompleted > 0) bedtimeDelta = 1;
+    }
+
+    // 起床 Δt
+    let wakeupDelta = 0;
+    if (dayData.wakeupTime) {
+      const targetTime = dateFrom(dateStr, planDay.wake);
+      const actualTime = dateFrom(dateStr, dayData.wakeupTime.slice(0,5));
+      const diffMinutes = (actualTime - targetTime) / 60000;
+      if (diffMinutes <= 15) wakeupDelta = 2;
+      else if (diffMinutes <= 45) wakeupDelta = 1;
+    }
+
+    dayData.deltaT = bedtimeDelta + wakeupDelta;
+  }
+
+  // ========= 9) UI =========
   function planIndexByDate(dateStr){
     const keys = Object.keys(state.history).sort();
     const idx = keys.indexOf(dateStr);
@@ -937,6 +1217,29 @@ const getTodayDateString = () => {
     if (exportButton) exportButton.addEventListener('click', exportData);
     if (importFileInput) importFileInput.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importData(e.target.files[0]); e.target.value = ''; });
     if (resetButton) resetButton.addEventListener('click', () => { if (confirm('警告：这将清除你所有的数据和进度（备份不会删除）。确定要重置吗？')){ localStorage.removeItem(CANONICAL_KEY); location.reload(); } });
+
+    // 历史记录管理事件
+    historySearchEl.addEventListener('input', renderHistoryManager);
+    historyFilterEl.addEventListener('change', renderHistoryManager);
+    historyAddNewEl.addEventListener('click', () => openHistoryModal());
+
+    // 模态框事件
+    modalClose.addEventListener('click', closeHistoryModal);
+    modalCancel.addEventListener('click', closeHistoryModal);
+    modalSave.addEventListener('click', saveHistoryRecord);
+    modalDelete.addEventListener('click', deleteHistoryRecord);
+
+    // 点击模态框外部关闭
+    historyModal.addEventListener('click', (e) => {
+      if (e.target === historyModal) closeHistoryModal();
+    });
+
+    // ESC 键关闭模态框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && historyModal.classList.contains('show')) {
+        closeHistoryModal();
+      }
+    });
 
     // 同步设置 UI
     loadSyncUI();

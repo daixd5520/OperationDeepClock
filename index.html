@@ -24,6 +24,7 @@
       <button class="tab active" data-tab="today"    role="tab" aria-selected="true">今天</button>
       <button class="tab"         data-tab="focus"    role="tab" aria-selected="false">专注</button>
       <button class="tab"         data-tab="data"     role="tab" aria-selected="false">数据</button>
+      <button class="tab"         data-tab="history"  role="tab" aria-selected="false">历史</button>
       <button class="tab"         data-tab="settings" role="tab" aria-selected="false">设置</button>
     </nav>
 
@@ -144,6 +145,31 @@
       </div>
     </section>
 
+    <!-- Tab: 历史 -->
+    <section class="tab-panel" data-tab-panel="history">
+      <div class="history-manager">
+        <h2>历史记录管理</h2>
+        <div class="history-controls">
+          <div>
+            <input type="text" id="history-search" placeholder="搜索日期 (如: 2024-01-15)..." />
+            <select id="history-filter">
+              <option value="all">所有记录</option>
+              <option value="wakeup">有起床记录</option>
+              <option value="perfect">完美记录 (Δt=4)</option>
+              <option value="incomplete">未完成记录</option>
+            </select>
+            <button id="history-add-new" class="btn-ghost">添加记录</button>
+          </div>
+        </div>
+        <div id="history-list" class="history-list"></div>
+        <div id="history-placeholder" class="chart-placeholder">
+          <p>📅</p>
+          <p>暂无历史记录</p>
+          <p>开始记录后，这里将显示你的所有打卡历史</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Tab: 设置 -->
     <section class="tab-panel" data-tab-panel="settings">
       <div class="settings-card">
@@ -180,6 +206,58 @@
   </div>
 
   <div id="toast" class="toast"></div>
+
+  <!-- 历史记录编辑模态框 -->
+  <div id="history-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">编辑历史记录</h3>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>日期</label>
+          <input type="date" id="modal-date" required />
+        </div>
+
+        <div class="form-group">
+          <label>起床时间</label>
+          <input type="time" id="modal-wakeup-time" />
+        </div>
+
+        <div class="form-group">
+          <label>睡前清单完成情况</label>
+          <div id="modal-bedtime-list" class="modal-checklist"></div>
+        </div>
+
+        <div class="form-group">
+          <label>起床清单完成情况</label>
+          <div id="modal-morning-list" class="modal-checklist"></div>
+        </div>
+
+        <div class="form-group">
+          <label>专注任务</label>
+          <div class="focus-toggles">
+            <label class="toggle">
+              <input type="checkbox" id="modal-morning-focus" />
+              <span>晨间专注</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="modal-evening-focus" />
+              <span>晚间专注</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-delete" class="btn-danger">删除记录</button>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="btn-ghost">取消</button>
+          <button id="modal-save" class="btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

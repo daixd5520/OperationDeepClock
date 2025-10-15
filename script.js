@@ -24,14 +24,23 @@ const DAY_ROLLOVER_HOUR = 16; // 下午4点切换到新的一天
 
 const getTodayDateString = () => {
   const now = new Date();
+  // 使用本地时间而不是UTC时间
+  const localHour = now.getHours();
   const adjusted = new Date(now.getTime());
+
   // 如果当前时间小于日界线时间，则认为是"昨天"
-  if (now.getHours() < DAY_ROLLOVER_HOUR) {
+  if (localHour < DAY_ROLLOVER_HOUR) {
     adjusted.setDate(adjusted.getDate() - 1);
   }
   // 设置为日界线时间以确保日期计算正确
   adjusted.setHours(DAY_ROLLOVER_HOUR, 0, 0, 0);
   return adjusted.toISOString().split('T')[0];
+};
+
+// 添加一个函数来获取当前日历日期（用于用户可见的记录）
+const getCurrentCalendarDate = () => {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
 };
 
   // ========= 1) 计划数据 =========
@@ -920,8 +929,21 @@ const getTodayDateString = () => {
     if (!dayInfo.wakeActions){ dayInfo.wakeActions = ['醒来后喝水', '拉开窗帘，接触日光', '简单吃点东西']; }
 
     const todayStr = getTodayDateString();
+
+    // 调试信息
+    console.log('=== UI更新调试信息 ===');
+    console.log('当前时间:', new Date().toISOString());
+    console.log('本地时间:', new Date().toLocaleString('zh-CN'));
+    console.log('本地小时:', new Date().getHours());
+    console.log('日界线小时:', DAY_ROLLOVER_HOUR);
+    console.log('计算出的今天日期:', todayStr);
+    console.log('历史记录:', Object.keys(state.history).sort());
+
     if (!state.history[todayStr]){
       state.history[todayStr] = { bedtime: Array(dayInfo.sleepRitual.length).fill(false), morning: Array((dayInfo.wakeActions || []).length).fill(false), wakeupTime: null, deltaT: 0, morningFocusDone: false, eveningFocusDone: false };
+      console.log('创建了今天的记录:', todayStr);
+    } else {
+      console.log('今天的记录已存在:', todayStr, state.history[todayStr]);
     }
     Object.keys(state.history).forEach(d => {
       const idx = Math.min((Number(d >= todayStr) ? dayIndex : planIndexByDate(d)), planData.length - 1);
@@ -949,8 +971,29 @@ const getTodayDateString = () => {
     }
 
     const todayHistory = state.history[todayStr];
-    if (todayHistory.wakeupTime){ wakeupButton.disabled = true; wakeupButton.textContent = "已记录"; wakeupTimeDisplay.textContent = todayHistory.wakeupTime; }
-    else { wakeupButton.disabled = false; wakeupButton.textContent = "我起床了！"; wakeupTimeDisplay.textContent = "--:--:--"; }
+  const currentCalendarDate = getCurrentCalendarDate();
+  const todayCalendarHistory = state.history[currentCalendarDate] || {};
+
+    // 调试起床按钮状态
+    console.log('=== 起床按钮调试 ===');
+    console.log('应用今天日期:', todayStr);
+    console.log('日历日期:', currentCalendarDate);
+    console.log('应用今天历史记录:', todayHistory);
+    console.log('日历日期历史记录:', todayCalendarHistory);
+    console.log('起床时间:', todayCalendarHistory.wakeupTime);
+
+    // 起床按钮显示当前日历日期的记录状态
+    if (todayCalendarHistory.wakeupTime){
+      console.log('起床按钮状态: 已记录');
+      wakeupButton.disabled = true;
+      wakeupButton.textContent = "已记录";
+      wakeupTimeDisplay.textContent = todayCalendarHistory.wakeupTime;
+    } else {
+      console.log('起床按钮状态: 未记录');
+      wakeupButton.disabled = false;
+      wakeupButton.textContent = "我起床了！";
+      wakeupTimeDisplay.textContent = "--:--:--";
+    }
 
     updateProgressBar();
     renderDashboard();
@@ -961,6 +1004,18 @@ const getTodayDateString = () => {
     const { morning, evening } = calcFocusWeights();
     morningWeightEl.textContent = `${morning}%`; eveningWeightEl.textContent = `${evening}%`;
     const windows = calcFocusWindows(dayInfo, todayStr);
+
+    // 专注页面调试信息
+    console.log('=== 专注页面调试 ===');
+    console.log('当前Day:', state.currentDay);
+    console.log('权重计算:', { morning, evening });
+    console.log('目标时间:', { wake: dayInfo.wake, sleep: dayInfo.sleep });
+    console.log('专注窗口:', windows);
+    console.log('专注状态:', {
+      morningFocusDone: todayHistory.morningFocusDone,
+      eveningFocusDone: todayHistory.eveningFocusDone
+    });
+
     focusMorningWindowEl.textContent = windows.morning;
     focusEveningWindowEl.textContent = windows.evening;
 
@@ -1165,9 +1220,32 @@ const getTodayDateString = () => {
   }
   function handleWakeupClick(){
     const timeString = new Date().toTimeString().split(' ')[0];
-    const todayStr = getTodayDateString();
-    if (!state.history[todayStr]) return;
-    state.history[todayStr].wakeupTime = timeString;
+    // 对于起床记录，使用当前日历日期，这样凌晨的起床记录会保存在正确的日期
+    const recordDate = getCurrentCalendarDate();
+
+    console.log('起床记录调试:', {
+      记录时间: timeString,
+      应用今天: getTodayDateString(),
+      记录日期: recordDate
+    });
+
+    // 如果记录日期不存在，创建一个新的记录
+    if (!state.history[recordDate]) {
+      // 获取当天应该的计划信息
+      const dayIndex = Math.min(state.currentDay - 1, planData.length - 1);
+      const planDay = planData[dayIndex];
+      state.history[recordDate] = {
+        bedtime: Array(planDay.sleepRitual.length).fill(false),
+        morning: Array((planDay.wakeActions || []).length).fill(false),
+        wakeupTime: null,
+        deltaT: 0,
+        morningFocusDone: false,
+        eveningFocusDone: false,
+        dateStr: recordDate
+      };
+    }
+
+    state.history[recordDate].wakeupTime = timeString;
     saveState(); updateUI();
     const combo = getCurrentCombo();
     if ([3,5,7,14].includes(combo)) { const t = comboTier(combo); showToast(`徽章解锁：${t.name} ×${combo}`); }

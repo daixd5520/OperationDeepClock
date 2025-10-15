@@ -978,12 +978,33 @@ const getTodayDateString = () => {
     let totalDeltaT = 0, currentStreak = 0, longestStreak = 0;
 
     if (totalDays > 0){
-      let lastDate = new Date(historyKeys[0]); lastDate.setDate(lastDate.getDate() - 1);
+      let lastDate = null;
       for (const dateStr of historyKeys){
         const dayDelta = state.history[dateStr]?.deltaT || 0; totalDeltaT += dayDelta;
-        const currentDate = new Date(dateStr); const diffDays = Math.round((currentDate - lastDate) / 86400000);
-        if (diffDays === 1 && dayDelta > 0) currentStreak++; else if (dayDelta > 0) currentStreak = 1;
-        if (currentStreak > longestStreak) longestStreak = currentStreak; lastDate = currentDate;
+        const currentDate = new Date(dateStr);
+
+        if (dayDelta > 0) {
+          if (lastDate === null) {
+            // 第一个有Δt的记录，开始新的连续
+            currentStreak = 1;
+          } else {
+            const diffDays = Math.round((currentDate - lastDate) / 86400000);
+            if (diffDays === 1) {
+              // 与前一天连续
+              currentStreak++;
+            } else {
+              // 不连续，重新开始
+              currentStreak = 1;
+            }
+          }
+          lastDate = currentDate;
+        } else {
+          // 没有Δt的记录，重置连续
+          currentStreak = 0;
+          lastDate = null;
+        }
+
+        if (currentStreak > longestStreak) longestStreak = currentStreak;
       }
     }
     state.longestStreak = Math.max(state.longestStreak, longestStreak);

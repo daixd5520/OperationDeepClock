@@ -11,6 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const pad2 = (n) => String(n).padStart(2, '0');
+  const formatDate = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  const describeHour = (hour) => {
+    if (hour === 0) return '凌晨0点';
+    if (hour < 6) return `凌晨${hour}点`;
+    if (hour < 12) return `上午${hour}点`;
+    if (hour === 12) return '中午12点';
+    if (hour < 18) return `下午${hour - 12}点`;
+    if (hour < 24) return `晚上${hour - 12}点`;
+    return `${hour}点`;
+  };
 
   const parseHM = (hm) => { const [h, m] = hm.split(':').map(Number); return { h, m }; };
   const dateFrom = (dateStr, hm) => { const d = new Date(`${dateStr}T00:00:00`); const { h, m } = parseHM(hm); d.setHours(h, m, 0, 0); return d; };
@@ -24,17 +34,11 @@ const DAY_ROLLOVER_HOUR = 16; // 下午4点切换到新的一天
 
 const getTodayDateString = () => {
   const now = new Date();
-  // 使用本地时间而不是UTC时间
-  const localHour = now.getHours();
-  const adjusted = new Date(now.getTime());
-
-  // 如果当前时间小于日界线时间，则认为是"昨天"
-  if (localHour < DAY_ROLLOVER_HOUR) {
-    adjusted.setDate(adjusted.getDate() - 1);
-  }
-  // 设置为日界线时间以确保日期计算正确
-  adjusted.setHours(DAY_ROLLOVER_HOUR, 0, 0, 0);
-  return adjusted.toISOString().split('T')[0];
+  const offsetMs = DAY_ROLLOVER_HOUR * 60 * 60 * 1000;
+  const shifted = new Date(now.getTime() - offsetMs);
+  shifted.setHours(0, 0, 0, 0);
+  shifted.setDate(shifted.getDate() + 1);
+  return formatDate(shifted);
 };
 
 
@@ -1231,7 +1235,7 @@ const getTodayDateString = () => {
     updateUI();
 
     // 显示日界线设置提示
-    showToast(`🌙 日界线已设置为凌晨${DAY_ROLLOVER_HOUR}点切换新的一天`);
+    showToast(`🌙 日界线已设置为${describeHour(DAY_ROLLOVER_HOUR)}切换新的一天`);
 
     sleepRitualListEl.addEventListener('change', handleChecklistChange);
     if (wakeActionsListEl) wakeActionsListEl.addEventListener('change', handleChecklistChange);
